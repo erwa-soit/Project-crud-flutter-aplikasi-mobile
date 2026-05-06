@@ -1,10 +1,21 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+
 import 'package:crud_project_pencatatan_keuangan/screens/create_screen.dart';
 import 'package:crud_project_pencatatan_keuangan/db/database_instance.dart';
 import 'package:crud_project_pencatatan_keuangan/screens/update_screen.dart';
 import 'package:crud_project_pencatatan_keuangan/models/transaksi_model.dart';
-import 'package:flutter/material.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  } else {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   runApp(const MyApp());
 }
 
@@ -15,169 +26,301 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: "Pencatatan Keuangan Pribadi",
-      // TEMA PINK
+      title: "Pencatatan Keuangan",
       theme: ThemeData(
-        primarySwatch: Colors.pink,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.pink,
-          foregroundColor: Colors.white,
+        useMaterial3: true,
+        colorSchemeSeed: Colors.pink,
+        // --- FIX: APPBAR TIDAK BERUBAH WARNA SAAT DI-SCROLL ---
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.pink.shade50,
+          surfaceTintColor: Colors.transparent, // Mengunci warna agar tidak berubah
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: const TextStyle(
+            color: Colors.black87, 
+            fontWeight: FontWeight.bold, 
+            fontSize: 20
+          ),
+        ),
+        // --- FIX: NAVBAR LEBIH RAMPING & TIPIS ---
+        navigationBarTheme: NavigationBarThemeData(
+          height: 60, // Memperpendek tinggi bar
+          indicatorColor: Colors.pink.shade100.withOpacity(0.5),
+          indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)
+          ),
         ),
       ),
-      home: const MyHomePage(),
+      home: const MainPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key}) : super(key: key);
+class MainPage extends StatefulWidget {
+  const MainPage({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  DatabaseInstance? databaseInstance;
-
-  Future _refresh() async {
-    setState(() {});
-  }
-
-  @override
-  void initState() {
-    databaseInstance = DatabaseInstance();
-    initDatabase();
-    super.initState();
-  }
-
-  Future initDatabase() async {
-    await databaseInstance!.database();
-    setState(() {});
-  }
-
-  showAlertDialog(BuildContext context, int idTransaksi) {
-    Widget okButton = TextButton(
-      child: const Text("Yakin"),
-      onPressed: () {
-        databaseInstance!.hapus(idTransaksi);
-        Navigator.pop(context);
-        setState(() {});
-      },
-    );
-
-    AlertDialog alertDialog = AlertDialog(
-      title: const Text("Peringatan !"),
-      content: const Text("Anda yakin akan menghapus ?"),
-      actions: [okButton],
-    );
-
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return alertDialog;
-        });
-  }
+class _MainPageState extends State<MainPage> {
+  int _currentIndex = 0;
+  final DatabaseInstance databaseInstance = DatabaseInstance();
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> _children = [
+      DashboardPage(databaseInstance: databaseInstance),
+      ListTransaksiPage(databaseInstance: databaseInstance, type: 1),
+      ListTransaksiPage(databaseInstance: databaseInstance, type: 2),
+    ];
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Home Kelola Duitku"),
+      body: _children[_currentIndex],
+      bottomNavigationBar: NavigationBar(
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        selectedIndex: _currentIndex,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined, size: 22), 
+            selectedIcon: Icon(Icons.home_rounded, size: 22), 
+            label: 'Beranda'
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined, size: 22), 
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded, size: 22), 
+            label: 'Pemasukan'
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shopping_bag_outlined, size: 22), 
+            selectedIcon: Icon(Icons.shopping_bag_rounded, size: 22), 
+            label: 'Pengeluaran'
+          ),
+        ],
       ),
+      floatingActionButton: _currentIndex == 0 
+  ? null 
+  : SizedBox(
+      height: 45, // Ukuran tombol lebih ramping
+      child: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context)
+              .push(MaterialPageRoute(
+                  builder: (context) => CreateScreen(type: _currentIndex)))
+              .then((value) => setState(() {}));
+        },
+        // MENGUNCI WARNA KE PINK SOFT (TIDAK TERLALU MENYALA)
+        backgroundColor: Colors.pink.shade300, 
+        foregroundColor: Colors.white,
+        elevation: 1,
+        highlightElevation: 3,
+        icon: Icon(_currentIndex == 1 ? Icons.add_rounded : Icons.remove_rounded, size: 18),
+        label: Text(
+          _currentIndex == 1 ? "Tambah Masuk" : "Tambah Keluar",
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ),
+    ),
+    );
+  }
+}
+
+class DashboardPage extends StatefulWidget {
+  final DatabaseInstance databaseInstance;
+  const DashboardPage({Key? key, required this.databaseInstance}) : super(key: key);
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text("Pencatatan Keuangan")),
       body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: SafeArea(
+        onRefresh: () async => setState(() {}),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 20),
-              FutureBuilder<int>(
-                  future: databaseInstance!.totalPemasukan(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Text("-");
-                    } else {
-                      return Text(
-                          "Total pemasukan : Rp. ${snapshot.data ?? 0}",
-                          style: const TextStyle(fontWeight: FontWeight.bold));
-                    }
-                  }),
-              const SizedBox(height: 10),
-              FutureBuilder<int>(
-                  future: databaseInstance!.totalPengeluaran(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Text("-");
-                    } else {
-                      return Text(
-                          "Total pengeluaran : Rp. ${snapshot.data ?? 0}",
-                          style: const TextStyle(fontWeight: FontWeight.bold));
-                    }
-                  }),
-              const Divider(height: 30),
+              const SizedBox(height: 15),
+              FutureBuilder<List<int>>(
+                future: Future.wait([
+                  widget.databaseInstance.totalPemasukan(),
+                  widget.databaseInstance.totalPengeluaran(),
+                ]),
+                builder: (context, snapshot) {
+                  int masuk = snapshot.data?[0] ?? 0;
+                  int keluar = snapshot.data?[1] ?? 0;
+                  int saldo = masuk - keluar;
+
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          _buildMiniStat("Pemasukan", masuk, Icons.arrow_downward_rounded, Colors.green),
+                          const SizedBox(width: 12),
+                          _buildMiniStat("Pengeluaran", keluar, Icons.arrow_upward_rounded, Colors.red),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.pink.shade50.withOpacity(0.5), 
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.pink.shade100),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.account_balance_wallet_rounded, color: Colors.pink.shade300, size: 20),
+                                const SizedBox(width: 10),
+                                const Text("Sisa Saldo Anda", 
+                                  style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            Text(
+                              "Rp ${saldo.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}",
+                              style: TextStyle(
+                                color: saldo < 0 ? Colors.red.shade700 : Colors.pink.shade800,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+              ),
+              const SizedBox(height: 30),
+              const Text("Transaksi Terakhir", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
               FutureBuilder<List<TransaksiModel>>(
-                  future: databaseInstance!.getAll(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else {
-                      if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                        return Expanded(
-                          child: ListView.builder(
-                              itemCount: snapshot.data!.length,
-                              itemBuilder: (context, index) {
-                                return ListTile(
-                                  title: Text(snapshot.data![index].name!),
-                                  subtitle: Text("Rp. ${snapshot.data![index].total}"),
-                                  leading: snapshot.data![index].type == 1
-                                      ? const Icon(Icons.download, color: Colors.green)
-                                      : const Icon(Icons.upload, color: Colors.red),
-                                  trailing: Wrap(
-                                    children: [
-                                      IconButton(
-                                          onPressed: () {
-                                            Navigator.of(context)
-                                                .push(MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        UpdateScreen(
-                                                          transaksiMmodel: snapshot.data![index],
-                                                        )))
-                                                .then((value) {
-                                              setState(() {});
-                                            });
-                                          },
-                                          icon: const Icon(Icons.edit, color: Colors.grey)),
-                                      IconButton(
-                                          onPressed: () {
-                                            showAlertDialog(context, snapshot.data![index].id!);
-                                          },
-                                          icon: const Icon(Icons.delete, color: Colors.red))
-                                    ],
-                                  ),
-                                );
-                              }),
-                        );
-                      } else {
-                        return const Expanded(
-                          child: Center(child: Text("Tidak ada data")),
-                        );
-                      }
-                    }
-                  })
+                future: widget.databaseInstance.getAll(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("Belum ada transaksi")));
+                  }
+                  var recentData = snapshot.data!.take(5).toList();
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: recentData.length,
+                    itemBuilder: (context, index) {
+                      var item = recentData[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)]
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: item.type == 1 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                            child: Icon(
+                              item.type == 1 ? Icons.south_west_rounded : Icons.north_east_rounded,
+                              color: item.type == 1 ? Colors.green : Colors.red, size: 18,
+                            ),
+                          ),
+                          title: Text(item.name!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          trailing: Text("Rp ${item.total}", style: TextStyle(color: item.type == 1 ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
-      // TOMBOL TAMBAH DI BAWAH
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => const CreateScreen()))
-              .then((value) {
-            setState(() {});
-          });
+    );
+  }
+
+  Widget _buildMiniStat(String title, int amount, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+            Text("Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}", 
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ListTransaksiPage extends StatefulWidget {
+  final DatabaseInstance databaseInstance;
+  final int type;
+  const ListTransaksiPage({Key? key, required this.databaseInstance, required this.type}) : super(key: key);
+
+  @override
+  State<ListTransaksiPage> createState() => _ListTransaksiPageState();
+}
+
+class _ListTransaksiPageState extends State<ListTransaksiPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: Text(widget.type == 1 ? "Daftar Pemasukan" : "Daftar Pengeluaran")),
+      body: FutureBuilder<List<TransaksiModel>>(
+        future: widget.databaseInstance.getAll(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final data = snapshot.data!.where((item) => item.type == widget.type).toList();
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final item = data[index];
+              return Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.pink.shade50)),
+                child: ListTile(
+                  title: Text(item.name!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text("Rp ${item.total}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(icon: const Icon(Icons.edit_note, color: Colors.blue), onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => UpdateScreen(transaksiMmodel: item))).then((value) => setState(() {}));
+                      }),
+                      IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () {
+                        widget.databaseInstance.hapus(item.id!).then((value) => setState(() {}));
+                      }),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
         },
-        backgroundColor: Colors.pink,
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
