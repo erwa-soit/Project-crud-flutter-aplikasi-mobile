@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:crud_project_pencatatan_keuangan/db/database_instance.dart';
 
 class CreateScreen extends StatefulWidget {
-  final int type;
+  final int type; // 1 untuk Pemasukan, 2 untuk Pengeluaran
   const CreateScreen({Key? key, required this.type}) : super(key: key);
 
   @override
@@ -23,6 +23,7 @@ class _CreateScreenState extends State<CreateScreen> {
           widget.type == 1 ? "Tambah Pemasukan" : "Tambah Pengeluaran",
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
+        // Warna Pink Soft sesuai Dashboard
         backgroundColor: Colors.pink.shade50,
         surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.pink.shade900,
@@ -33,77 +34,113 @@ class _CreateScreenState extends State<CreateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Keterangan", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Keterangan", 
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
             const SizedBox(height: 10),
             TextField(
               controller: nameController,
               decoration: InputDecoration(
+                hintText: "", // Kosong tanpa contoh
                 filled: true,
                 fillColor: Colors.pink.withOpacity(0.03),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 25),
-            const Text("Jumlah Saldo", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Jumlah Saldo", 
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
             const SizedBox(height: 10),
             TextField(
               controller: totalController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                prefixText: "Rp ", // Ini hanya hiasan, user cukup ketik angka
+                prefixText: "Rp ",
                 filled: true,
                 fillColor: Colors.pink.withOpacity(0.03),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 40),
             
+            // TOMBOL SIMPAN PINK SOFT
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
                 onPressed: () async {
-                  // --- LOGIKA PEMBERSIH TERPAKSA ---
-                  // Menghapus Rp, spasi, titik, atau koma agar tersisa angka saja
-                  String rawValue = totalController.text;
-                  String cleanValue = rawValue.replaceAll(RegExp(r'[^0-9]'), '');
-
-                  if (nameController.text.isEmpty || cleanValue.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Isi Keterangan dan Jumlah dulu!")),
-                    );
+                  // Bersihkan input dari karakter non-angka (Rp, titik, spasi)
+                  String cleanTotal = totalController.text.replaceAll(RegExp(r'[^0-9]'), '');
+                  
+                  // Validasi Input Kosong
+                  if (nameController.text.isEmpty || cleanTotal.isEmpty) {
+                    _showSnackBar("Isi keterangan dan jumlah dulu ya!", Colors.orange);
                     return;
                   }
 
+                  int nominalInput = int.parse(cleanTotal);
+
+                  // --- LOGIKA CEK SALDO (REVISI DOSEN) ---
+                  if (widget.type == 2) { // Jika sedang mencatat Pengeluaran
+                    int totalMasuk = await databaseInstance.totalPemasukan();
+                    int totalKeluar = await databaseInstance.totalPengeluaran();
+                    int sisaSaldo = totalMasuk - totalKeluar;
+
+                    if (nominalInput > sisaSaldo) {
+                      // Alert merah hanya muncul di sini saat saldo tidak cukup
+                      _showSnackBar("Transaksi Gagal! Saldo anda tidak cukup", Colors.red.shade700);
+                      return; // Stop proses simpan
+                    }
+                  }
+
                   try {
-                    // Masukkan ke database
+                    // Simpan ke Database
                     await databaseInstance.insert({
                       'name': nameController.text,
                       'type': widget.type,
-                      'total': int.parse(cleanValue), // Konversi ke angka murni
+                      'total': nominalInput,
                       'created_at': DateTime.now().toString(),
                       'updated_at': DateTime.now().toString(),
                     });
 
-                    // Tutup halaman dan kirim sinyal 'true' untuk refresh data
-                    if (mounted) Navigator.pop(context, true);
+                    if (mounted) {
+                      _showSnackBar("Data berhasil disimpan", Colors.pink.shade400);
+                      Navigator.pop(context, true); // Kembali ke dashboard dengan refresh
+                    }
                   } catch (e) {
-                    // Jika masih gagal, munculkan pesan errornya apa
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Gagal Simpan: $e")),
-                    );
+                    _showSnackBar("Terjadi kesalahan: $e", Colors.red);
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink.shade400,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.pink.shade100, // Pink Soft
+                  foregroundColor: Colors.pink.shade900,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-                child: const Text("SIMPAN TRANSAKSI", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text("SIMPAN TRANSAKSI", 
+                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Fungsi Helper untuk memunculkan pesan SnackBar
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

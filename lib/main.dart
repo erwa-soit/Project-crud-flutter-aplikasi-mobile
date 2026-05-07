@@ -30,10 +30,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.pink,
-        // --- FIX: APPBAR TIDAK BERUBAH WARNA SAAT DI-SCROLL ---
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.pink.shade50,
-          surfaceTintColor: Colors.transparent, // Mengunci warna agar tidak berubah
+          surfaceTintColor: Colors.transparent,
           elevation: 0,
           centerTitle: false,
           titleTextStyle: const TextStyle(
@@ -42,9 +41,8 @@ class MyApp extends StatelessWidget {
             fontSize: 20
           ),
         ),
-        // --- FIX: NAVBAR LEBIH RAMPING & TIPIS ---
         navigationBarTheme: NavigationBarThemeData(
-          height: 60, // Memperpendek tinggi bar
+          height: 60,
           indicatorColor: Colors.pink.shade100.withOpacity(0.5),
           indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           labelTextStyle: WidgetStateProperty.all(
@@ -82,54 +80,36 @@ class _MainPageState extends State<MainPage> {
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         selectedIndex: _currentIndex,
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined, size: 22), 
-            selectedIcon: Icon(Icons.home_rounded, size: 22), 
-            label: 'Beranda'
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined, size: 22), 
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded, size: 22), 
-            label: 'Pemasukan'
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.shopping_bag_outlined, size: 22), 
-            selectedIcon: Icon(Icons.shopping_bag_rounded, size: 22), 
-            label: 'Pengeluaran'
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Beranda'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet_rounded), label: 'Pemasukan'),
+          NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), selectedIcon: Icon(Icons.shopping_bag_rounded), label: 'Pengeluaran'),
         ],
       ),
       floatingActionButton: _currentIndex == 0 
-  ? null 
-  : SizedBox(
-      height: 45, // Ukuran tombol lebih ramping
-      child: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context)
-              .push(MaterialPageRoute(
-                  builder: (context) => CreateScreen(type: _currentIndex)))
-              .then((value) => setState(() {}));
-        },
-        // MENGUNCI WARNA KE PINK SOFT (TIDAK TERLALU MENYALA)
-        backgroundColor: Colors.pink.shade300, 
-        foregroundColor: Colors.white,
-        elevation: 1,
-        highlightElevation: 3,
-        icon: Icon(_currentIndex == 1 ? Icons.add_rounded : Icons.remove_rounded, size: 18),
-        label: Text(
-          _currentIndex == 1 ? "Tambah Masuk" : "Tambah Keluar",
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ),
-    ),
+          ? null 
+          : SizedBox(
+              height: 45,
+              child: FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (context) => CreateScreen(type: _currentIndex)))
+                      .then((value) => setState(() {}));
+                },
+                backgroundColor: Colors.pink.shade300, 
+                foregroundColor: Colors.white,
+                elevation: 1,
+                icon: Icon(_currentIndex == 1 ? Icons.add_rounded : Icons.remove_rounded, size: 18),
+                label: Text(_currentIndex == 1 ? "Tambah Masuk" : "Tambah Keluar", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ),
     );
   }
 }
 
+// --- HALAMAN DASHBOARD ---
 class DashboardPage extends StatefulWidget {
   final DatabaseInstance databaseInstance;
   const DashboardPage({Key? key, required this.databaseInstance}) : super(key: key);
-
   @override
   State<DashboardPage> createState() => _DashboardPageState();
 }
@@ -158,7 +138,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   int masuk = snapshot.data?[0] ?? 0;
                   int keluar = snapshot.data?[1] ?? 0;
                   int saldo = masuk - keluar;
-
                   return Column(
                     children: [
                       Row(
@@ -169,39 +148,44 @@ class _DashboardPageState extends State<DashboardPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.pink.shade50.withOpacity(0.5), 
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.pink.shade100),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.account_balance_wallet_rounded, color: Colors.pink.shade300, size: 20),
-                                const SizedBox(width: 10),
-                                const Text("Sisa Saldo Anda", 
-                                  style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                            Text(
-                              "Rp ${saldo.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}",
-                              style: TextStyle(
-                                color: saldo < 0 ? Colors.red.shade700 : Colors.pink.shade800,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      // --- BAGIAN SISA SALDO DI DASHBOARD ---
+// Cari bagian Card Saldo di DashboardPage (main.dart)
+Container(
+  width: double.infinity,
+  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20), // Padding vertikal dikecilkan
+  decoration: BoxDecoration(
+    color: Colors.pink.shade50, // Pink Soft selaras
+    borderRadius: BorderRadius.circular(15),
+    border: Border.all(color: Colors.pink.shade100),
+  ),
+  child: Column(
+    mainAxisSize: MainAxisSize.min, // Agar kotak tidak besar (ramping)
+    children: [
+      // ANGKA DI ATAS
+      Text(
+        saldo < 0 ? "Rp 0" : "Rp ${saldo.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}",
+        style: TextStyle(
+          color: saldo < 0 ? Colors.red.shade700 : Colors.pink.shade800,
+          fontSize: 22, // Ukuran angka pas
+          fontWeight: FontWeight.bold
+        ),
+      ),
+      const SizedBox(height: 4),
+      // TEKS DI BAWAH
+      Text(
+        saldo < 0 ? "Saldo Anda Tidak Cukup" : "Sisa Saldo Anda",
+        style: TextStyle(
+          color: saldo < 0 ? Colors.red.shade700 : Colors.black54,
+          fontSize: 12,
+          fontWeight: FontWeight.w500
+        ),
+      ),
+    ],
+  ),
+),
                     ],
                   );
-                }
+                },
               ),
               const SizedBox(height: 30),
               const Text("Transaksi Terakhir", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -229,13 +213,13 @@ class _DashboardPageState extends State<DashboardPage> {
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: item.type == 1 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                            child: Icon(
-                              item.type == 1 ? Icons.south_west_rounded : Icons.north_east_rounded,
-                              color: item.type == 1 ? Colors.green : Colors.red, size: 18,
-                            ),
+                            child: Icon(item.type == 1 ? Icons.south_west_rounded : Icons.north_east_rounded, color: item.type == 1 ? Colors.green : Colors.red, size: 18),
                           ),
                           title: Text(item.name!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          trailing: Text("Rp ${item.total}", style: TextStyle(color: item.type == 1 ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                          trailing: Text(
+                            "Rp ${item.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}", 
+                            style: TextStyle(color: item.type == 1 ? Colors.green : Colors.red, fontWeight: FontWeight.bold)
+                          ),
                         ),
                       );
                     },
@@ -273,11 +257,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
+// --- HALAMAN DAFTAR TRANSAKSI (DENGAN POP-UP HAPUS) ---
 class ListTransaksiPage extends StatefulWidget {
   final DatabaseInstance databaseInstance;
   final int type;
   const ListTransaksiPage({Key? key, required this.databaseInstance, required this.type}) : super(key: key);
-
   @override
   State<ListTransaksiPage> createState() => _ListTransaksiPageState();
 }
@@ -293,6 +277,8 @@ class _ListTransaksiPageState extends State<ListTransaksiPage> {
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final data = snapshot.data!.where((item) => item.type == widget.type).toList();
+          if (data.isEmpty) return const Center(child: Text("Data masih kosong"));
+          
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: data.length,
@@ -304,16 +290,59 @@ class _ListTransaksiPageState extends State<ListTransaksiPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.pink.shade50)),
                 child: ListTile(
                   title: Text(item.name!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("Rp ${item.total}"),
+                  subtitle: Text("Rp ${item.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}"),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(icon: const Icon(Icons.edit_note, color: Colors.blue), onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => UpdateScreen(transaksiMmodel: item))).then((value) => setState(() {}));
-                      }),
-                      IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () {
-                        widget.databaseInstance.hapus(item.id!).then((value) => setState(() {}));
-                      }),
+                      IconButton(
+                        icon: const Icon(Icons.edit_note, color: Colors.blue), 
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => UpdateScreen(transaksiMmodel: item))).then((value) => setState(() {}))
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red), 
+                        onPressed: () {
+                          // POP-UP KONFIRMASI HAPUS
+                         
+showDialog(
+  context: context,
+  builder: (context) => AlertDialog(
+    // KUNCINYA: Atur insetPadding agar kotak mengecil secara horizontal
+    insetPadding: const EdgeInsets.symmetric(horizontal: 100), 
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    contentPadding: const EdgeInsets.only(top: 20, left: 20, right: 20, bottom: 10),
+    title: const Center(
+      child: Text("Hapus?", 
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+    ),
+    content: const Text(
+      "Yakin mau hapus data ini?",
+      textAlign: TextAlign.center,
+      style: TextStyle(fontSize: 14),
+    ),
+    actionsAlignment: MainAxisAlignment.spaceEvenly, // Tombol berjejer rapi
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+      ),
+      TextButton(
+        onPressed: () async {
+          await widget.databaseInstance.hapus(item.id!);
+          Navigator.pop(context);
+          setState(() {});
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Berhasil dihapus"), behavior: SnackBarBehavior.floating),
+          );
+        },
+        child: const Text("Hapus", 
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+      ),
+    ],
+  ),
+);
+                        }
+                      ),
                     ],
                   ),
                 ),
